@@ -5,7 +5,7 @@ description: "Review a git diff or explicit file scope for reuse, code quality, 
 
 # Simplify Code
 
-Review changed code for reuse, quality, efficiency, and clarity issues. Apply only high-confidence, behavior-preserving fixes unless the user explicitly wants review only.
+Review changed code for reuse, quality, efficiency, and clarity issues. Use Codex sub-agents to review in parallel, then optionally apply only high-confidence, behavior-preserving fixes.
 
 ## Modes
 
@@ -20,7 +20,7 @@ If the user does not specify, default to:
 - `review-only` for "review", "audit", or "check"
 - `safe-fixes` for "simplify", "clean up", or "refactor"
 
-## Step 1: Define Scope
+## Step 1: Determine the Scope and Diff Command
 
 Prefer this scope order:
 
@@ -40,69 +40,81 @@ When using git changes, determine the smallest correct diff command based on the
 
 Do not assume `git diff HEAD` is the right default when a smaller diff is available.
 
-## Step 2: Load Local Instructions
-
 Before reviewing standards or applying fixes, read the repo's local instruction files and relevant project docs for the touched area. Prefer the closest applicable guidance, such as:
 
 - `AGENTS.md`
 - repo workflow docs
 - architecture or style docs for the touched module
 
-Use those instructions to interpret what counts as a real issue versus an intentional local pattern.
+Use those instructions to distinguish real issues from intentional local patterns.
 
-## Step 3: Decide Review Shape
+## Step 2: Launch Four Review Sub-Agents in Parallel
 
-Use the smallest review shape that matches the scope:
+Use Codex sub-agents when the scope is large enough for parallel review to help. For a tiny diff or one very small file, it is acceptable to review locally instead.
 
-- Tiny scope: review locally
-  Use this for one small file or a small diff where parallel review would add overhead.
-- Medium scope: split the review into two lanes
-  For example, one lane for reuse and quality, one lane for efficiency and clarity.
-- Large scope: run multiple Codex review lanes in parallel
-  Use this when the diff spans multiple files or concerns and parallel review will materially reduce latency.
+When spawning sub-agents:
 
-If parallel review is used, each review lane should inspect the same scope but focus on one responsibility. Keep prompts narrow and request concise, structured findings only.
+- give each sub-agent the same scope
+- tell each sub-agent to inspect only its assigned review role
+- ask for concise, structured findings only
+- ask each sub-agent to report file, line or symbol, problem, recommended fix, and confidence
 
-## Step 4: Run the Review
+Use four review roles.
 
-Review the scoped changes using these categories.
+### Sub-Agent 1: Code Reuse Review
 
-### Reuse
+Review the changes for reuse opportunities:
 
-- Search for existing helpers, utilities, or shared abstractions that already solve the same problem.
-- Flag duplicated functions or near-duplicate logic introduced in the change.
-- Flag inline logic that should call an existing helper instead of re-implementing it.
+1. Search for existing helpers, utilities, or shared abstractions that already solve the same problem.
+2. Flag duplicated functions or near-duplicate logic introduced in the change.
+3. Flag inline logic that should call an existing helper instead of re-implementing it.
 
-### Code Quality
+Recommended sub-agent role: `explorer` for broad codebase lookup, or `reviewer` if a stronger review pass is more useful than wide search.
 
-- Redundant state, cached values, or derived values stored unnecessarily
-- Parameter sprawl caused by threading new arguments through existing call chains
-- Copy-paste with slight variation that should become a shared abstraction
-- Leaky abstractions or ownership violations across module boundaries
-- Stringly-typed values where existing typed contracts, enums, or constants already exist
+### Sub-Agent 2: Code Quality Review
 
-### Efficiency
+Review the same changes for code quality issues:
 
-- Repeated work, duplicate reads, duplicate API calls, or unnecessary recomputation
-- Sequential work that could safely run concurrently
-- New work added to startup, render, request, or other hot paths without clear need
-- Pre-checks for existence when the operation itself can be attempted directly and errors handled
-- Memory growth, missing cleanup, or listener/subscription leaks
-- Overly broad reads or scans when the code only needs a subset
+1. Redundant state, cached values, or derived values stored unnecessarily
+2. Parameter sprawl caused by threading new arguments through existing call chains
+3. Copy-paste with slight variation that should become a shared abstraction
+4. Leaky abstractions or ownership violations across module boundaries
+5. Stringly-typed values where existing typed contracts, enums, or constants already exist
 
-### Clarity and Standards
+Recommended sub-agent role: `reviewer`
 
-- Violations of local project conventions or module patterns
-- Unnecessary complexity, deep nesting, weak names, or redundant comments
-- Overly compact or clever code that reduces readability
-- Over-simplification that collapses separate concerns into one unclear unit
-- Dead code, dead abstractions, or indirection without value
+### Sub-Agent 3: Efficiency Review
+
+Review the same changes for efficiency issues:
+
+1. Repeated work, duplicate reads, duplicate API calls, or unnecessary recomputation
+2. Sequential work that could safely run concurrently
+3. New work added to startup, render, request, or other hot paths without clear need
+4. Pre-checks for existence when the operation itself can be attempted directly and errors handled
+5. Memory growth, missing cleanup, or listener/subscription leaks
+6. Overly broad reads or scans when the code only needs a subset
+
+Recommended sub-agent role: `reviewer`
+
+### Sub-Agent 4: Clarity and Standards Review
+
+Review the same changes for clarity, local standards, and balance:
+
+1. Violations of local project conventions or module patterns
+2. Unnecessary complexity, deep nesting, weak names, or redundant comments
+3. Overly compact or clever code that reduces readability
+4. Over-simplification that collapses separate concerns into one unclear unit
+5. Dead code, dead abstractions, or indirection without value
+
+Recommended sub-agent role: `reviewer`
 
 Only report issues that materially improve maintainability, correctness, or cost. Do not churn code just to make it look different.
 
-## Step 5: Return Structured Findings
+## Step 3: Aggregate Findings
 
-Whether reviewing locally or in parallel, normalize findings into this shape:
+Wait for all review sub-agents to complete, then merge their findings.
+
+Normalize findings into this shape:
 
 1. File and line or nearest symbol
 2. Category: reuse, quality, efficiency, or clarity
@@ -110,9 +122,9 @@ Whether reviewing locally or in parallel, normalize findings into this shape:
 4. Recommended fix
 5. Confidence: high, medium, or low
 
-Discard weak or duplicative findings before editing.
+Discard weak, duplicative, or instruction-conflicting findings before editing.
 
-## Step 6: Apply Fixes Carefully
+## Step 4: Fix Issues Carefully
 
 In `review-only` mode, stop after reporting findings.
 
@@ -133,7 +145,7 @@ Prefer fixes like:
 
 Do not stage, commit, or push changes as part of this skill.
 
-## Step 7: Validate When Required
+## Step 5: Validate When Required
 
 In `fix-and-validate` mode, run the smallest relevant validation for the touched scope after edits.
 
@@ -147,7 +159,7 @@ Prefer fast, scoped validation over full-suite runs unless the change breadth ju
 
 If validation is skipped because the user asked not to run it, say so explicitly.
 
-## Step 8: Summarize Outcome
+## Step 6: Summarize Outcome
 
 Close with a brief result:
 
