@@ -15,6 +15,7 @@ Build and maintain macOS menubar apps with a Tuist-first workflow and stable lau
 - Keep model decoding resilient to API drift: optional fields, safe fallbacks, and defensive parsing.
 - Treat Tuist manifests as the source of truth. Do not rely on hand-edited generated Xcode artifacts.
 - Prefer script-based launch for local iteration when `tuist run` is unreliable for macOS target/device resolution.
+- Prefer `tuist xcodebuild build` over raw `xcodebuild` in local run scripts when building generated projects.
 
 ## Expected File Shape
 
@@ -53,13 +54,14 @@ Use this placement by default:
 - Ensure run script restarts an existing instance before relaunching.
 - Ensure run script does not open Xcode as a side effect.
 - Use `tuist generate --no-open` when generation is required.
+- When the run script builds the generated project, prefer `TUIST_SKIP_UPDATE_CHECK=1 tuist xcodebuild build ...` instead of invoking raw `xcodebuild` directly.
 
 ## Validation Matrix
 
 Run validations after edits:
 
 ```bash
-TUIST_SKIP_UPDATE_CHECK=1 tuist build <TargetName> --configuration Debug
+TUIST_SKIP_UPDATE_CHECK=1 tuist xcodebuild build -scheme <TargetName> -configuration Debug
 ```
 
 If launch workflow changed:
