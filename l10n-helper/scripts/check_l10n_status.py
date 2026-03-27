@@ -42,10 +42,10 @@ def check_l10n_status(root_dir):
                 translated_count = 0
                 for key, info in strings.items():
                     localizations = info.get("localizations", {})
-                    if lang in localizations:
-                        state = localizations[lang].get("state")
-                        if state in ["translated", "reviewed"]:
-                            translated_count += 1
+                    loc = localizations.get(lang, {})
+                    state = loc.get("stringUnit", {}).get("state")
+                    if state in ["translated", "reviewed"]:
+                        translated_count += 1
                 
                 percentage = (translated_count / total_keys * 100) if total_keys > 0 else 100
                 print(f"  [{lang}] {translated_count}/{total_keys} ({percentage:.1f}%)")

@@ -275,27 +275,23 @@ def verify_sync(output_file: Path, catalogs: list[dict], all_strings_data: dict)
 
 def main():
     parser = argparse.ArgumentParser(description='Generate L10n.generated.swift from String Catalogs')
-    parser.add_argument('--input-dir', type=str, 
-                        default='macos/SwiftTrans/SwiftTrans/Resources',
-                        help='Directory containing .xcstrings files')
+    parser.add_argument('--input-dir', type=str,
+                        default='.',
+                        help='Directory containing .xcstrings files (default: current directory)')
     parser.add_argument('--output', type=str,
-                        default='macos/SwiftTrans/SwiftTrans/Resources/L10n.generated.swift',
-                        help='Output file path')
+                        default=None,
+                        help='Output file path (default: L10n.generated.swift in --input-dir)')
     parser.add_argument('--dry-run', action='store_true',
                         help='Print output instead of writing to file')
     parser.add_argument('--verify', action='store_true',
                         help='Verify if generated file is in sync with String Catalogs')
     
     args = parser.parse_args()
-    
-    # 获取项目根目录
-    script_dir = Path(__file__).resolve().parent
-    # 从 .agent/skills/l10n-helper/scripts/ 到项目根目录 (4 级向上递归)
-    # 0: scripts, 1: l10n-helper, 2: skills, 3: .agent, 4: project root
-    project_root = script_dir.parents[3]
-    
-    input_dir = project_root / args.input_dir
-    output_file = project_root / args.output
+
+    # Resolve paths relative to current working directory
+    project_root = Path.cwd()
+    input_dir = (project_root / args.input_dir).resolve()
+    output_file = (project_root / args.output).resolve() if args.output else input_dir / "L10n.generated.swift"
     
     if not input_dir.exists():
         print(f"Error: Input directory not found: {input_dir}")

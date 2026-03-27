@@ -1,65 +1,79 @@
 ---
 name: l10n-helper
-description: Assists with the UI localization process, including extracting strings, translating contents, and updating Xcode String Catalogs (.xcstrings).
+description: >
+  Assists with iOS/macOS app localization using Xcode String Catalogs (.xcstrings).
+  Handles the full workflow: scanning for hardcoded strings, managing localization keys,
+  reading/updating translations, checking coverage, and generating type-safe Swift enums.
+  Use this skill proactively whenever the user mentions localization, translation, l10n, i18n,
+  .xcstrings files, String Catalogs, missing translations, hardcoded strings in SwiftUI,
+  or wants to add/update strings for a new language.
 ---
 
 # L10n Helper Skill
 
-You are an expert in iOS application localization (L10n) and internationalization (i18n). Your goal is to ensure the application is perfectly localized into target languages (primarily English and Simplified Chinese) while maintaining technical correctness and consistent tone.
+Expert in iOS/macOS app localization. Manages `.xcstrings` String Catalog files natively
+via Python scripts — no MCP server or external tooling required.
+
+## Available Scripts
+
+All scripts live in `<skill-path>/scripts/`. Reference the skill's own directory when invoking:
+
+```bash
+SKILL=<path-to-skill>/l10n-helper/scripts
+
+# Inspect a catalog
+python3 $SKILL/xcstrings_tool.py list-languages path/to/Localizable.xcstrings
+python3 $SKILL/xcstrings_tool.py statistics path/to/Localizable.xcstrings
+python3 $SKILL/xcstrings_tool.py list-keys path/to/Localizable.xcstrings [--limit N] [--offset N]
+python3 $SKILL/xcstrings_tool.py search-keys path/to/Localizable.xcstrings "query"
+python3 $SKILL/xcstrings_tool.py get-key path/to/Localizable.xcstrings "some.key"
+
+# Add or update translations
+python3 $SKILL/xcstrings_tool.py update path/to/Localizable.xcstrings '{"data": [...]}'
+
+# Scan Swift source for hardcoded strings
+python3 $SKILL/scan_strings.py [directory]
+
+# Check translation coverage across all .xcstrings files
+python3 $SKILL/check_l10n_status.py [directory]
+
+# Generate type-safe L10n.generated.swift enum from .xcstrings
+python3 $SKILL/generate_l10n.py [--input-dir DIR] [--output FILE] [--dry-run] [--verify]
+```
 
 ## Workflow
 
-### 1. Identify Non-Localized Strings
-- Search the codebase for hardcoded strings in SwiftUI views (e.g., `Text("Hello")`).
-- Identify strings that need translation but are not yet using a localization key or are missing from the String Catalog.
+### 1. Find the String Catalog
 
-### 2. Prepare Localization Keys
-- Use descriptive, dot-notated keys (e.g., `settings.general.title`, `onboarding.welcome_message`).
-- Ensure keys are consistent across the project.
+First locate the `.xcstrings` file(s) in the project. Common locations:
+- `<Target>/Resources/Localizable.xcstrings`
+- `<Target>/Localizable.xcstrings`
 
-### 3. Extract and Update String Catalogs
-Use the `string-catalog-mcp` tools to manage `.xcstrings` files:
-- `mcp_list_all_keys`: Check existing keys to avoid duplicates.
-- `mcp_update_translations`: Add or update keys and their translations.
+Run `check_l10n_status.py` on the project root to find all catalogs and see coverage at a glance.
 
-### 5. Synchronize Swift Code
-- Run the enum generation script to update `L10n.generated.swift`.
-- Verify that the new keys are available in code as `L10n.YourKey`.
+### 2. Identify Non-Localized Strings
 
-### 4. Translation Guidelines
-- **Target Languages**: Always provide translations for `en` (English) and `zh-CN` (Simplified Chinese).
-- **Placeholders**: Preserve format placeholders exactly (e.g., `%@`, `%d`, `%lld`, `%f`).
-- **Context**: Use the `comment` field in `mcp_update_translations` to provide context for translators (e.g., "Button label", "Error message").
-- **Consistency**: Refer to existing translations to maintain a consistent tone (e.g., using "Done" vs "Finish").
+- Run `scan_strings.py` to find `Text("hardcoded string")` patterns in Swift files.
+- Look for strings not yet using a localization key or missing from the catalog.
 
-## Automation Scripts
+### 3. Choose or Create Keys
 
-The skill includes scripts to assist with the process:
+Use descriptive, dot-notated keys that reflect the hierarchy of the UI:
+- `settings.general.title`
+- `history.clear_button`
+- `onboarding.welcome_message`
 
-- **Scan for hardcoded strings**: Finds `Text("...")` that might need localization.
-  ```bash
-  python3 .agent/skills/l10n-helper/scripts/scan_strings.py [directory]
-  ```
-- **Check localization status**: Reports translation coverage across all `.xcstrings` files.
-  ```bash
-  python3 .agent/skills/l10n-helper/scripts/check_l10n_status.py [directory]
-  ```
-- **Generate type-safe enums**: Synchronizes `.xcstrings` with `L10n.generated.swift`.
-  ```bash
-  python3 .agent/skills/l10n-helper/scripts/generate_l10n.py
-  ```
+Before creating a new key, check whether a similar one exists:
+```bash
+python3 $SKILL/xcstrings_tool.py search-keys Localizable.xcstrings "settings"
+```
 
-## Usage Examples
+### 4. Add or Update Translations
 
-### Adding a New String
-**Input**: I need to localize the "Clear History" button in `HistoryView.swift`.
-**Process**:
-1. Check `/Users/richard/Code/github_projects/SwiftTransProj/SwiftTrans/macos/SwiftTrans/SwiftTrans/Resources/Localizable.xcstrings`.
-2. Determine key: `history.clear_button`.
-3. Use `mcp_update_translations`:
+Provide all target languages in one `update` call. The payload format:
+
 ```json
 {
-  "filePath": "/path/to/Localizable.xcstrings",
   "data": [
     {
       "key": "history.clear_button",
@@ -73,11 +87,68 @@ The skill includes scripts to assist with the process:
 }
 ```
 
-### Checking Coverage
-Use `mcp_get_catalog_statistics` to see if any languages are missing translations.
+Pass inline:
+```bash
+python3 $SKILL/xcstrings_tool.py update Localizable.xcstrings '{"data": [...]}'
+```
+
+Or pass a JSON file:
+```bash
+python3 $SKILL/xcstrings_tool.py update Localizable.xcstrings translations.json
+```
+
+### 5. Verify Coverage
+
+```bash
+python3 $SKILL/xcstrings_tool.py statistics Localizable.xcstrings
+```
+
+All languages should show 100%.
+
+### 6. Regenerate the Swift Enum (if the project uses one)
+
+```bash
+python3 $SKILL/generate_l10n.py --input-dir path/to/Resources --output path/to/L10n.generated.swift
+```
+
+This produces a type-safe `L10n` enum so keys are used as `L10n.History.clearButton` in code.
+
+Verify the generated file is in sync:
+```bash
+python3 $SKILL/generate_l10n.py --input-dir path/to/Resources --verify
+```
+
+## Translation Guidelines
+
+- **Target languages**: Always provide translations for every language already in the catalog. Check with `list-languages` first.
+- **Placeholders**: Preserve `%@`, `%d`, `%lld`, `%f` exactly. Positional args (`%1$@`, `%2$@`) may be reordered to fit natural grammar.
+- **Comments**: Use the `comment` field to give context to translators (e.g., "Button label", "Error message title").
+- **Consistency**: Before translating, run `get-key` on related keys to match existing tone and terminology.
+- **Chinese**: Use Simplified Chinese (zh-CN) with PRC terminology.
+
+## Batch Translation Workflow
+
+For translating many missing strings at once:
+
+1. Run `statistics` to see which languages have gaps.
+2. Run `list-keys` (with pagination if needed) to get all keys.
+3. For each key that's missing translations, run `get-key` to see the source text.
+4. Build a JSON payload with all missing translations and run `update` in one batch.
+
+## Translation Review
+
+When reviewing existing translations:
+
+1. Use `statistics` to identify languages with lower coverage.
+2. Use `list-keys` + `get-key` to inspect specific strings.
+3. Check that placeholder counts match the source string.
+4. Look for suspiciously short/long translations that might be truncated in the UI.
+5. Fix any issues with `update` (passing `"state": "translated"` to mark them correct).
 
 ## Quality Checklist
+
 - [ ] No hardcoded UI strings in `.swift` files.
-- [ ] Placeholders are preserved and correctly typed.
-- [ ] Chinese translations follow PR (People's Republic of China) terminology.
-- [ ] All supported languages have "translated" state.
+- [ ] All keys present in all supported languages.
+- [ ] Placeholders preserved and correctly typed in all translations.
+- [ ] `comment` field filled for context-dependent strings.
+- [ ] `L10n.generated.swift` regenerated after adding new keys.
