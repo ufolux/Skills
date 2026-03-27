@@ -42,14 +42,14 @@ Choose a track based on your goal:
 
 Use the narrowest state tool that matches the ownership model:
 
-| Scenario | Preferred pattern |
-| --- | --- |
-| Local UI state owned by one view | `@State` |
-| Child mutates parent-owned value state | `@Binding` |
-| Root-owned reference model on iOS 17+ | `@State` with an `@Observable` type |
-| Child reads or mutates an injected `@Observable` model on iOS 17+ | Pass it explicitly as a stored property |
-| Shared app service or configuration | `@Environment(Type.self)` |
-| Legacy reference model on iOS 16 and earlier | `@StateObject` at the root, `@ObservedObject` when injected |
+| Scenario                                                          | Preferred pattern                                           |
+| ----------------------------------------------------------------- | ----------------------------------------------------------- |
+| Local UI state owned by one view                                  | `@State`                                                    |
+| Child mutates parent-owned value state                            | `@Binding`                                                  |
+| Root-owned reference model on iOS 17+                             | `@State` with an `@Observable` type                         |
+| Child reads or mutates an injected `@Observable` model on iOS 17+ | Pass it explicitly as a stored property                     |
+| Shared app service or configuration                               | `@Environment(Type.self)`                                   |
+| Legacy reference model on iOS 16 and earlier                      | `@StateObject` at the root, `@ObservedObject` when injected |
 
 Choose the ownership location first, then pick the wrapper. Do not introduce a reference model when plain value state is enough.
 
@@ -83,10 +83,83 @@ Choose the ownership location first, then pick the wrapper. Do not introduce a r
 ## Component references
 
 Use `references/components-index.md` as the entry point. Each component reference should include:
+
 - Intent and best-fit scenarios.
 - Minimal usage pattern with local conventions.
 - Pitfalls and performance notes.
 - Paths to existing examples in the current repo.
+
+## Sheet patterns
+
+### Item-driven sheet (preferred)
+
+```swift
+@State private var selectedItem: Item?
+
+.sheet(item: $selectedItem) { item in
+    EditItemSheet(item: item)
+}
+```
+
+### Sheet owns its actions
+
+```swift
+struct EditItemSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @Environment(Store.self) private var store
+
+    let item: Item
+    @State private var isSaving = false
+
+    var body: some View {
+        VStack {
+            Button(isSaving ? "Saving…" : "Save") {
+                Task { await save() }
+            }
+        }
+    }
+
+    private func save() async {
+        isSaving = true
+        await store.save(item)
+        dismiss()
+    }
+}
+```
+
+## Spinning / loading button animation
+
+<!-- Evolution: 2026-03-11 | source: ep-2026-03-11-001 | pattern: swiftui_spin_animation_bool_not_angle -->
+
+Use a `Bool` to drive `repeatForever` rotation. **Never** accumulate an angle with `+= 360` — it freezes the icon mid-arc when stopped.
+
+```swift
+@State private var isSpinning = false
+
+Image(systemName: "arrow.clockwise")
+    .rotationEffect(.degrees(isSpinning ? 360 : 0))
+    .animation(
+        isSpinning
+            ? .linear(duration: 0.8).repeatForever(autoreverses: false)
+            : .linear(duration: 0),   // NOT .default — avoids snap
+        value: isSpinning
+    )
+
+// Start spinning
+isSpinning = true
+
+// Stop cleanly (no snap, no freeze)
+isSpinning = false
+```
+
+**Key rule**: use `.linear(duration: 0)` — not `.default` — when stopping. `.default` adds a spring that causes a visible snap on small icons.
+
+To handle mount-while-loading:
+
+```swift
+.onAppear { isSpinning = viewModel.isLoading }
+.onChange(of: viewModel.isLoading) { isSpinning = $0 }
+```
 
 ## Adding a new component reference
 
