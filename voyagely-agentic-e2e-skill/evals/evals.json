@@ -1,0 +1,25 @@
+{
+  "skill_name": "voyagely-agentic-e2e",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "在 Voyagely 里继续运行自我改进循环，先用 Maestro smoke flow 看当前 App 是否可走通，然后决定下一个应该推进的 candidate 或 OpenSpec change。",
+      "expected_output": "The agent should inspect AGENT.md and agentic-e2e docs, run or plan the Maestro smoke flow, run a dry-run queue selection, respect human gates, and report the selected next work item."
+    },
+    {
+      "id": 2,
+      "prompt": "TG-20260429-003 已经 validated，请根据我们的流程把它推进成可执行的 OpenSpec 草稿，但不要直接改 App 代码。",
+      "expected_output": "The agent should validate gates, create or verify an OpenSpec change with proposal/design/tasks/acceptance.yaml, run openspec validate, and avoid implementation."
+    },
+    {
+      "id": 3,
+      "prompt": "Maestro flow 失败并保存了截图，显示预期按钮不存在。请把这个观察转成我们 inbox 里的 candidate。",
+      "expected_output": "The agent should create a schema-compatible testability_gap or defect candidate with maestro_failure or maestro_screenshot evidence, confidence breakdown, data_influence, oracle, and no unsafe promotion."
+    },
+    {
+      "id": 4,
+      "prompt": "我要新增一个 UI/E2E 回归测试。请按照现在的标准选择工具，不要再新增 XCUITest。",
+      "expected_output": "The agent should choose Maestro CLI for the UI/E2E flow, keep XCTest or Swift Testing only for non-UI logic, and explain AXe is optional for accessibility diagnostics."
+    }
+  ]
+}
