@@ -37,6 +37,10 @@ If the user interrupted an automation run, check for stale processes and stop on
 ps -eo pid,ppid,command | rg "agentic-e2e/runner/run.mjs|codex exec --cd .*/VoyaProject" || true
 ```
 
+## Context Management
+
+When the active context reaches 85%, run a context compact before continuing. Do this proactively to avoid context-window related mistakes during long agentic loops.
+
 ## The Loop
 
 Run the workflow as a budgeted loop, not an unbounded background job.
